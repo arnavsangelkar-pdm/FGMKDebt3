@@ -179,10 +179,7 @@ class SQLiteStore:
             fts_count = cursor.fetchone()[0]
             
             self.logger.info(
-                f"SQLite upsert completed for {doc_id}",
-                doc_id=doc_id,
-                chunks_count=len(chunks),
-                fts_count=fts_count
+                f"SQLite upsert completed for {doc_id}, chunks_count={len(chunks)}, fts_count={fts_count}"
             )
             
         except Exception as e:
