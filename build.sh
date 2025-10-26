@@ -57,7 +57,24 @@ npm install
 
 # Build frontend
 echo "Building frontend..."
-npm run build
+echo "Current working directory: $(pwd)"
+echo "Contents of current directory:"
+ls -la
+echo "Contents of public directory:"
+ls -la public/
+echo "Checking if React is looking in wrong directory..."
+if [ -d "../src" ]; then
+    echo "Found ../src directory, creating symlink for React"
+    mkdir -p ../src/rag-frontend
+    ln -sf $(pwd)/public ../src/rag-frontend/public
+    echo "Created symlink: ../src/rag-frontend/public -> $(pwd)/public"
+fi
+echo "Creating alternative directory structure for React..."
+mkdir -p ../src/rag-frontend/public
+cp -r public/* ../src/rag-frontend/public/
+echo "Copied public files to ../src/rag-frontend/public/"
+echo "Running npm run build with explicit paths..."
+PUBLIC_URL=. npm run build
 
 # Check if build was successful
 if [ ! -d "build" ]; then
