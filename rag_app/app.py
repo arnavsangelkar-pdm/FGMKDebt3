@@ -14,16 +14,16 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 
-from .config import settings
-from .models import (
+from config import settings
+from models import (
     IngestRequest, IngestResponse, QueryRequest, QueryResponse,
     HealthResponse, ErrorResponse
 )
-from .ingest import DocumentIngester
-from .retrieve import HybridRetriever
-from .answer import AnswerGenerator
-from .debug_query import QueryDebugger
-from .utils.logging import setup_logging, log_timing, log_error
+from ingest import DocumentIngester
+from retrieve import HybridRetriever
+from answer import AnswerGenerator
+from debug_query import QueryDebugger
+from utils.logging import setup_logging, log_timing, log_error
 
 
 # Setup logging

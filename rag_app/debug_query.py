@@ -7,10 +7,10 @@ import logging
 from typing import List, Dict, Any
 from openai import OpenAI
 
-from .config import settings
-from .retrieve import HybridRetriever
-from .answer import AnswerGenerator
-from .utils.logging import setup_logging
+from config import settings
+from retrieve import HybridRetriever
+from answer import AnswerGenerator
+from utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 

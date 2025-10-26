@@ -10,8 +10,8 @@ from typing import List, Dict, Any, Optional
 import sqlite3
 from sqlite3 import Connection
 
-from ..config import settings
-from ..utils.chunking import Chunk
+from config import settings
+from utils.chunking import Chunk
 
 
 logger = logging.getLogger(__name__)

@@ -11,13 +11,13 @@ from typing import List, Dict, Any
 import pandas as pd
 from openai import OpenAI
 
-from .config import settings
-from .models import IngestResponse
-from .utils.parsing import PDFParser
-from .utils.chunking import TokenAwareChunker
-from .store.faiss_store import FAISSStore
-from .store.sqlite_store import SQLiteStore
-from .utils.logging import log_timing
+from config import settings
+from models import IngestResponse
+from utils.parsing import PDFParser
+from utils.chunking import TokenAwareChunker
+from store.faiss_store import FAISSStore
+from store.sqlite_store import SQLiteStore
+from utils.logging import log_timing
 
 
 logger = logging.getLogger(__name__)

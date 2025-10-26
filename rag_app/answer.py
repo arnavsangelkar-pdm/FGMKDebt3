@@ -9,8 +9,8 @@ from dataclasses import dataclass
 
 from openai import OpenAI
 
-from .config import settings
-from .models import Citation, Snippet
+from config import settings
+from models import Citation, Snippet
 
 
 logger = logging.getLogger(__name__)
