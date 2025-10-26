@@ -41,7 +41,7 @@ const DocumentQuery: React.FC<DocumentQueryProps> = ({ docId, onQueryResponse })
     setError('');
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/query`, {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || ''}/query`, {
         doc_id: docId,
         question: question.trim(),
         k: 5

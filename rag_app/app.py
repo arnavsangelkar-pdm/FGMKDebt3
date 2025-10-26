@@ -10,6 +10,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 
@@ -49,6 +50,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files for frontend
+static_path = Path(__file__).parent / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+
 # Initialize OpenAI client
 openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -82,6 +88,17 @@ async def startup_event():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/")
+async def serve_frontend():
+    """Serve the frontend application."""
+    static_path = Path(__file__).parent / "static" / "index.html"
+    if static_path.exists():
+        from fastapi.responses import FileResponse
+        return FileResponse(str(static_path))
+    else:
+        return {"message": "Frontend not built. Please run 'npm run build' in the rag-frontend directory."}
 
 
 @app.post("/ingest", response_model=IngestResponse)

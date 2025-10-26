@@ -2,20 +2,19 @@
 
 ## Pre-Deployment Checklist
 
-- [ ] **Backend API is deployed and accessible**
-  - [ ] Backend is running on Render or another service
-  - [ ] API endpoints are working (`/ingest`, `/query`)
-  - [ ] CORS is configured to allow frontend domain
-  - [ ] You have the backend API URL
+- [ ] **OpenAI API Key ready**
+  - [ ] You have a valid OpenAI API key
+  - [ ] API key has sufficient credits
+  - [ ] Key is ready to be added as environment variable
 
 - [ ] **Code is ready**
   - [ ] All changes committed to git
   - [ ] Code pushed to repository (GitHub/GitLab)
   - [ ] No console errors in development
-  - [ ] Build runs successfully locally (`npm run build`)
+  - [ ] Build runs successfully locally (`./build.sh`)
 
 - [ ] **Environment variables prepared**
-  - [ ] `REACT_APP_API_URL` = Your backend API URL
+  - [ ] `OPENAI_API_KEY` = Your OpenAI API key
   - [ ] `REACT_APP_APP_NAME` = "Debt Agreement Analysis"
 
 ## Deployment Steps

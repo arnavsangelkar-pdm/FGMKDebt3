@@ -52,7 +52,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onDocumentUploaded }) =
       formData.append('doc_id', docId);
       formData.append('file', file);
 
-      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/ingest`, formData, {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || ''}/ingest`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

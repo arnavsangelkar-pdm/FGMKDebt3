@@ -1,9 +1,18 @@
 services:
   - type: web
-    name: debt-agreement-analysis-frontend
-    env: static
-    buildCommand: npm install && npm run build
-    staticPublishPath: ./build
+    name: debt-agreement-analysis
+    env: python
+    buildCommand: |
+      cd rag_app && pip install -r requirements.txt
+      cd ../rag-frontend && npm install && npm run build
+      cp -r build/* ../rag_app/static/
+    startCommand: cd rag_app && python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: NODE_VERSION
+        value: 18
+    healthCheckPath: /health
     headers:
       - path: /*
         name: X-Frame-Options
@@ -16,8 +25,4 @@ services:
         value: strict-origin-when-cross-origin
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.render.com;"
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';"

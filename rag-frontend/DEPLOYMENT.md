@@ -1,12 +1,12 @@
-# Deployment Guide for Debt Agreement Analysis Frontend
+# Deployment Guide for Debt Agreement Analysis
 
-This guide will help you deploy the Debt Agreement Analysis frontend to Render.
+This guide will help you deploy the full-stack Debt Agreement Analysis application to Render as a Web Service.
 
 ## Prerequisites
 
 1. A Render account (free tier available)
-2. Your backend API deployed and accessible
-3. Git repository with your code
+2. Git repository with your code
+3. OpenAI API key
 
 ## Step 1: Prepare Your Repository
 
@@ -17,31 +17,35 @@ This guide will help you deploy the Debt Agreement Analysis frontend to Render.
    git push origin main
    ```
 
-2. **Ensure your backend API is deployed and accessible** (you'll need the URL for the next step)
+2. **Test the build locally (optional):**
+   ```bash
+   ./build.sh
+   ```
 
 ## Step 2: Deploy to Render
 
 ### Option A: Deploy via Render Dashboard
 
 1. **Go to [Render Dashboard](https://dashboard.render.com)**
-2. **Click "New +" and select "Static Site"**
+2. **Click "New +" and select "Web Service"**
 3. **Connect your repository:**
    - Choose your Git provider (GitHub, GitLab, etc.)
    - Select your repository
    - Choose the branch (usually `main`)
 
 4. **Configure the deployment:**
-   - **Name:** `debt-agreement-analysis-frontend`
-   - **Build Command:** `npm install && npm run build`
-   - **Publish Directory:** `build`
-   - **Node Version:** `18` (or latest LTS)
+   - **Name:** `debt-agreement-analysis`
+   - **Environment:** `Python 3`
+   - **Build Command:** `cd rag_app && pip install -r requirements.txt && cd ../rag-frontend && npm install && npm run build && cp -r build/* ../rag_app/static/`
+   - **Start Command:** `cd rag_app && python app.py`
+   - **Python Version:** `3.11.0`
 
 5. **Add Environment Variables:**
    - Click "Advanced" → "Environment Variables"
-   - Add: `REACT_APP_API_URL` = `https://your-backend-api.onrender.com`
+   - Add: `OPENAI_API_KEY` = `your-openai-api-key`
    - Add: `REACT_APP_APP_NAME` = `Debt Agreement Analysis`
 
-6. **Click "Create Static Site"**
+6. **Click "Create Web Service"**
 
 ### Option B: Deploy via render.yaml (Recommended)
 
@@ -51,12 +55,13 @@ This guide will help you deploy the Debt Agreement Analysis frontend to Render.
 4. **Connect your repository and select the branch**
 5. **Render will automatically detect the render.yaml file and configure the deployment**
 
-## Step 3: Configure Your Backend API URL
+## Step 3: Configure Environment Variables
 
 1. **After deployment, go to your service settings**
 2. **Navigate to Environment Variables**
-3. **Update `REACT_APP_API_URL` to point to your actual backend API URL**
-4. **Redeploy the service**
+3. **Add the following variables:**
+   - `OPENAI_API_KEY` = Your OpenAI API key
+   - `REACT_APP_APP_NAME` = "Debt Agreement Analysis"
 
 ## Step 4: Custom Domain (Optional)
 
