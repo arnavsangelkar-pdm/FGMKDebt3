@@ -15,7 +15,7 @@ from openai import OpenAI
 from config import settings
 from models import (
     IngestRequest, IngestResponse, QueryRequest, QueryResponse,
-    DocumentStats, HealthResponse, ErrorResponse
+    HealthResponse, ErrorResponse
 )
 from utils.logging import setup_logging, log_timing, log_error
 
@@ -209,45 +209,6 @@ async def query_document(request: QueryRequest):
         log_error(logger, e, "document_query", doc_id=request.doc_id, question=request.question)
         raise HTTPException(status_code=500, detail="Document query failed")
 
-@app.get("/docs/{doc_id}/stats", response_model=DocumentStats)
-async def get_document_stats(doc_id: str):
-    """
-    Get statistics for a document.
-    """
-    logger.info(f"Getting document stats", doc_id=doc_id)
-    
-    try:
-        # Get ingestion stats
-        ingester = get_ingester()
-        stats = ingester.get_ingestion_stats(doc_id)
-        
-        if "error" in stats:
-            raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
-        
-        # Get file modification time
-        pdf_file = settings.docs_path / f"{doc_id}.pdf"
-        last_ingested = None
-        if pdf_file.exists():
-            last_ingested = pdf_file.stat().st_mtime
-        
-        # Create response
-        response = DocumentStats(
-            doc_id=doc_id,
-            pages_count=stats["sqlite"].get("pages_count", 0),
-            chunks_count=stats["sqlite"].get("chunks_count", 0),
-            faiss_vectors_count=stats["faiss"].get("vectors_count", 0),
-            last_ingested=last_ingested,
-            file_size_mb=stats.get("pdf_file_size_mb", 0),
-            index_size_mb=stats["faiss"].get("index_size_mb", 0) + stats["sqlite"].get("db_size_mb", 0)
-        )
-        
-        return response
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        log_error(logger, e, "document_stats", doc_id=doc_id)
-        raise HTTPException(status_code=500, detail="Failed to get document stats")
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):

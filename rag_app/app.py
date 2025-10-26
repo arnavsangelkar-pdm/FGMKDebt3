@@ -16,11 +16,12 @@ from openai import OpenAI
 from .config import settings
 from .models import (
     IngestRequest, IngestResponse, QueryRequest, QueryResponse,
-    DocumentStats, HealthResponse, ErrorResponse
+    HealthResponse, ErrorResponse
 )
 from .ingest import DocumentIngester
 from .retrieve import HybridRetriever
 from .answer import AnswerGenerator
+from .debug_query import QueryDebugger
 from .utils.logging import setup_logging, log_timing, log_error
 
 
@@ -198,50 +199,35 @@ async def query_document(request: QueryRequest):
         raise HTTPException(status_code=500, detail="Document query failed")
 
 
-@app.get("/docs/{doc_id}/stats", response_model=DocumentStats)
-async def get_document_stats(doc_id: str):
+@app.post("/debug/query")
+async def debug_query(request: QueryRequest):
     """
-    Get statistics for a document.
+    Debug a query to understand retrieval and answer quality.
     
     Args:
-        doc_id: Document identifier
+        request: QueryRequest with doc_id, question, and optional parameters
         
     Returns:
-        DocumentStats with document information
+        Detailed debug information about the query process
     """
-    logger.info(f"Getting document stats doc_id={doc_id}")
+    logger.info(f"Starting debug query doc_id={request.doc_id}, question={request.question}")
     
     try:
-        # Get ingestion stats
-        stats = ingester.get_ingestion_stats(doc_id)
+        # Initialize debugger
+        debugger = QueryDebugger(openai_client)
         
-        if "error" in stats:
-            raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
-        
-        # Get file modification time
-        pdf_file = settings.paths["docs"] / f"{doc_id}.pdf"
-        last_ingested = None
-        if pdf_file.exists():
-            last_ingested = pdf_file.stat().st_mtime
-        
-        # Create response
-        response = DocumentStats(
-            doc_id=doc_id,
-            pages_count=stats["sqlite"].get("pages_count", 0),
-            chunks_count=stats["sqlite"].get("chunks_count", 0),
-            faiss_vectors_count=stats["faiss"].get("vectors_count", 0),
-            last_ingested=last_ingested,
-            file_size_mb=stats.get("pdf_file_size_mb", 0),
-            index_size_mb=stats["faiss"].get("index_size_mb", 0) + stats["sqlite"].get("db_size_mb", 0)
+        # Run debug analysis
+        debug_result = debugger.debug_query(
+            doc_id=request.doc_id,
+            question=request.question,
+            k=request.k
         )
         
-        return response
+        return JSONResponse(content=debug_result)
         
-    except HTTPException:
-        raise
     except Exception as e:
-        log_error(logger, e, "document_stats", doc_id=doc_id)
-        raise HTTPException(status_code=500, detail="Failed to get document stats")
+        log_error(logger, e, "debug_query", doc_id=request.doc_id, question=request.question)
+        raise HTTPException(status_code=500, detail="Debug query failed")
 
 
 @app.exception_handler(HTTPException)

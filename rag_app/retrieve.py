@@ -173,7 +173,7 @@ class HybridRetriever:
     
     def _rerank_candidates(self, question: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Rerank candidates using BGE reranker.
+        Rerank candidates using BGE reranker with improved confidence scoring.
         
         Args:
             question: Query question
@@ -197,39 +197,49 @@ class HybridRetriever:
             # Get reranking scores
             rerank_scores = reranker.predict(pairs)
             
-            # Normalize scores to [0, 1] range
-            min_score = min(rerank_scores)
-            max_score = max(rerank_scores)
-            if max_score > min_score:
-                normalized_scores = [(score - min_score) / (max_score - min_score) for score in rerank_scores]
-            else:
-                normalized_scores = [1.0] * len(rerank_scores)
+            # Improved confidence scoring using sigmoid normalization
+            # This preserves the relative differences better than min-max normalization
+            import math
+            
+            # Apply sigmoid normalization to get better confidence distribution
+            def sigmoid_normalize(score, scale=2.0):
+                return 1 / (1 + math.exp(-scale * score))
+            
+            normalized_scores = [sigmoid_normalize(score) for score in rerank_scores]
             
             # Add scores to candidates and sort
             for i, candidate in enumerate(candidates):
                 candidate["rerank_score"] = float(rerank_scores[i])
                 candidate["confidence"] = float(normalized_scores[i])
+                
+                # Add combined score that considers both RRF and rerank scores
+                rrf_score = candidate.get("rrf_score", 0.0)
+                combined_score = 0.7 * normalized_scores[i] + 0.3 * rrf_score
+                candidate["combined_score"] = combined_score
             
-            # Sort by rerank score (descending)
-            reranked = sorted(candidates, key=lambda x: x["rerank_score"], reverse=True)
+            # Sort by combined score (descending) for better ranking
+            reranked = sorted(candidates, key=lambda x: x["combined_score"], reverse=True)
             
             top_score = reranked[0]["rerank_score"] if reranked else 0
+            top_confidence = reranked[0]["confidence"] if reranked else 0
             avg_conf = sum(c["confidence"] for c in reranked) / len(reranked) if reranked else 0
-            self.logger.info(f"Reranking completed, candidates_count={len(candidates)}, top_score={top_score}, avg_confidence={avg_conf}")
+            self.logger.info(f"Reranking completed, candidates_count={len(candidates)}, top_score={top_score:.3f}, top_confidence={top_confidence:.3f}, avg_confidence={avg_conf:.3f}")
             
             return reranked
             
         except Exception as e:
             self.logger.error(f"Failed to rerank candidates: {str(e)}", exc_info=True)
-            # Return original candidates without reranking
-            for candidate in candidates:
+            # Return original candidates without reranking but with basic confidence
+            for i, candidate in enumerate(candidates):
                 candidate["rerank_score"] = 0.0
-                candidate["confidence"] = 0.0
+                # Use RRF score as fallback confidence
+                candidate["confidence"] = candidate.get("rrf_score", 0.0)
+                candidate["combined_score"] = candidate["confidence"]
             return candidates
     
     def _apply_confidence_threshold(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Apply confidence threshold to filter results.
+        Apply confidence threshold to filter results with improved logic.
         
         Args:
             results: List of reranked results
@@ -240,14 +250,30 @@ class HybridRetriever:
         if not results:
             return []
         
-        # Check if the best result meets confidence threshold
+        # Get the best result's confidence
         best_confidence = results[0].get("confidence", 0.0)
+        best_combined_score = results[0].get("combined_score", 0.0)
         
-        if best_confidence < self.confidence_threshold:
-            self.logger.warning(f"Best result confidence {best_confidence:.3f} below threshold {self.confidence_threshold}")
-            return []  # Return empty results if confidence is too low
+        # More flexible thresholding: use either confidence or combined score
+        # Also consider if we have at least one decent result
+        meets_threshold = (best_confidence >= self.confidence_threshold or 
+                          best_combined_score >= self.confidence_threshold)
         
-        # Return all results (they're already sorted by confidence)
+        if not meets_threshold:
+            # If no result meets threshold, but we have some results, 
+            # return the top 2-3 results anyway (they might still be useful)
+            if len(results) >= 2:
+                self.logger.warning(f"Best result confidence {best_confidence:.3f} below threshold {self.confidence_threshold}, returning top 2 results")
+                return results[:2]
+            elif len(results) >= 1:
+                self.logger.warning(f"Best result confidence {best_confidence:.3f} below threshold {self.confidence_threshold}, returning top result")
+                return results[:1]
+            else:
+                self.logger.warning(f"Best result confidence {best_confidence:.3f} below threshold {self.confidence_threshold}, no results returned")
+                return []
+        
+        # Return all results (they're already sorted by combined score)
+        self.logger.info(f"Confidence threshold passed, returning {len(results)} results, best_confidence={best_confidence:.3f}")
         return results
     
     def get_retrieval_stats(self, doc_id: str) -> Dict[str, Any]:

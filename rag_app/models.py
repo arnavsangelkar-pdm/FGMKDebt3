@@ -67,17 +67,6 @@ class QueryResponse(BaseModel):
     processing_time: float
 
 
-class DocumentStats(BaseModel):
-    """Model for document statistics."""
-    doc_id: str
-    pages_count: int
-    chunks_count: int
-    faiss_vectors_count: int
-    last_ingested: Optional[str] = None
-    file_size_mb: Optional[float] = None
-    index_size_mb: Optional[float] = None
-
-
 class HealthResponse(BaseModel):
     """Response model for health check."""
     status: str = "ok"

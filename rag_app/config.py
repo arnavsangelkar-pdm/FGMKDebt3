@@ -7,13 +7,13 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
 
-    CHUNK_SIZE: int = 500
-    CHUNK_OVERLAP: int = 50
-    FAISS_K: int = 20
-    FTS_K: int = 20
-    RERANK_CANDIDATES: int = 30
-    RERANK_TOP_N: int = 5
-    CONFIDENCE_THRESHOLD: float = 0.35
+    CHUNK_SIZE: int = 800  # Increased for better context
+    CHUNK_OVERLAP: int = 100  # Increased overlap for better continuity
+    FAISS_K: int = 30  # More candidates from vector search
+    FTS_K: int = 30  # More candidates from keyword search
+    RERANK_CANDIDATES: int = 50  # More candidates for reranking
+    RERANK_TOP_N: int = 8  # More final results
+    CONFIDENCE_THRESHOLD: float = 0.2  # Lower threshold for more results
 
     DATA_DIR: str = "data"
 

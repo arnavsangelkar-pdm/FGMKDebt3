@@ -136,22 +136,36 @@ class AnswerGenerator:
         Returns:
             Generated answer text
         """
-        system_prompt = """You are a document QA assistant. You must use ONLY the provided snippets from the user's document to answer.
-- If the answer is not clearly supported by the snippets, reply exactly: "Not found in document."
-- For each sentence that uses evidence, add an inline citation formatted as [Doc: p. <page>].
-- Keep answers concise (1–5 sentences) and faithful to the source.
-- Do not speculate or use external knowledge."""
+        system_prompt = """You are a precise document QA assistant. Your task is to answer questions using ONLY the provided document snippets.
+
+CRITICAL RULES:
+1. Use ONLY information from the provided snippets - do not add external knowledge
+2. If the answer is not clearly supported by the snippets, reply exactly: "Not found in document."
+3. For each claim you make, add an inline citation: [Doc: p. <page>]
+4. Be specific and accurate - avoid vague or general statements
+5. If multiple snippets contain relevant information, synthesize them clearly
+6. If snippets contradict each other, mention this in your answer
+7. Keep answers concise but complete (2-6 sentences typically)
+8. Focus on directly answering the question asked
+
+Answer quality is more important than answer length."""
 
         user_prompt = f"""Question: "{question}"
 
-You are given {len(formatted_snippets.split('Snippet #')) - 1} snippets. Each snippet includes the source page.
-Snippets:
+You have access to {len(formatted_snippets.split('Snippet #')) - 1} document snippets. Each snippet includes the source page number.
+
+Document Snippets:
 {formatted_snippets}
 
 Instructions:
-- Answer only from the snippets.
-- Add [Doc: p. <page>] after each sentence that uses evidence.
-- If insufficient evidence: "Not found in document." """
+1. Read all snippets carefully to understand the context
+2. Identify which snippets are most relevant to the question
+3. Answer the question using ONLY information from the relevant snippets
+4. Add [Doc: p. <page>] after each sentence that uses evidence from a specific snippet
+5. If the question cannot be answered from the snippets, respond exactly: "Not found in document."
+6. Be precise and avoid making assumptions not supported by the text
+
+Answer:"""
 
         try:
             response = self.openai_client.chat.completions.create(
@@ -160,8 +174,11 @@ Instructions:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.1,  # Low temperature for consistent, factual responses
-                max_tokens=500,   # Limit response length
+                temperature=0.0,  # Zero temperature for maximum consistency
+                max_tokens=800,   # Increased for more detailed answers
+                top_p=0.9,        # Focus on most likely tokens
+                frequency_penalty=0.1,  # Slight penalty to avoid repetition
+                presence_penalty=0.1    # Slight penalty to encourage new information
             )
             
             answer = response.choices[0].message.content.strip()
