@@ -3,9 +3,28 @@ services:
     name: debt-agreement-analysis
     env: python
     buildCommand: |
-      cd rag_app && pip install -r requirements.txt
-      cd ../rag-frontend && npm install && npm run build
+      echo "Current directory: $(pwd)"
+      echo "Listing contents:"
+      ls -la
+      echo "Installing Python dependencies..."
+      pip install -r rag_app/requirements.txt
+      echo "Navigating to frontend directory..."
+      cd rag-frontend
+      echo "Current directory: $(pwd)"
+      echo "Listing frontend contents:"
+      ls -la
+      echo "Installing Node dependencies..."
+      npm install
+      echo "Building frontend..."
+      npm run build
+      echo "Checking build output:"
+      ls -la build/
+      echo "Creating static directory..."
+      mkdir -p ../rag_app/static
+      echo "Copying build files..."
       cp -r build/* ../rag_app/static/
+      echo "Verifying copy:"
+      ls -la ../rag_app/static/
     startCommand: cd rag_app && python app.py
     envVars:
       - key: PYTHON_VERSION
