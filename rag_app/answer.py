@@ -9,8 +9,8 @@ from dataclasses import dataclass
 
 from openai import OpenAI
 
-from config import settings
-from models import Citation, Snippet
+from .config import settings
+from .models import Citation, Snippet
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class AnswerGenerator:
         """
         self.openai_client = openai_client
         self.logger = logger
-        self.model = settings.openai_model
+        self.model = settings.OPENAI_MODEL
     
     def generate_answer(self, question: str, retrieved_results: List[Dict[str, Any]], doc_id: str) -> AnswerResult:
         """
@@ -62,7 +62,7 @@ class AnswerGenerator:
                 confidence=0.0
             )
         
-        self.logger.info(f"Generating answer for question: {question}", question=question, results_count=len(retrieved_results))
+        self.logger.info(f"Generating answer for question: {question}, results_count={len(retrieved_results)}")
         
         try:
             # Prepare snippets for the prompt
@@ -91,13 +91,7 @@ class AnswerGenerator:
                 confidence=confidence
             )
             
-            self.logger.info(
-                f"Answer generation completed",
-                question=question,
-                answer_length=len(answer_text),
-                citations_count=len(citations),
-                confidence=confidence
-            )
+            self.logger.info(f"Answer generation completed, question={question}, answer_length={len(answer_text)}, citations_count={len(citations)}, confidence={confidence}")
             
             return result
             

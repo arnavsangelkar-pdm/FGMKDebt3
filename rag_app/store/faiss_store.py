@@ -12,8 +12,8 @@ import faiss
 import numpy as np
 from openai import OpenAI
 
-from config import settings
-from utils.chunking import Chunk
+from ..config import settings
+from ..utils.chunking import Chunk
 
 
 logger = logging.getLogger(__name__)
@@ -31,11 +31,11 @@ class FAISSStore:
         """
         self.openai_client = openai_client
         self.logger = logger
-        self.embedding_model = settings.openai_embedding_model
+        self.embedding_model = settings.OPENAI_EMBEDDING_MODEL
         self.embedding_dim = 1536  # text-embedding-3-small dimension
         
         # Ensure indices directory exists
-        settings.indices_path.mkdir(parents=True, exist_ok=True)
+        settings.paths["indices"].mkdir(parents=True, exist_ok=True)
     
     def create_index(self, doc_id: str) -> faiss.IndexFlatIP:
         """
@@ -49,7 +49,7 @@ class FAISSStore:
         """
         # Use Inner Product (cosine similarity) index
         index = faiss.IndexFlatIP(self.embedding_dim)
-        self.logger.info(f"Created new FAISS index for {doc_id}", doc_id=doc_id)
+        self.logger.info(f"Created new FAISS index for {doc_id}")
         return index
     
     def load_index(self, doc_id: str) -> Optional[faiss.IndexFlatIP]:
@@ -70,7 +70,7 @@ class FAISSStore:
         
         try:
             index = faiss.read_index(str(index_path))
-            self.logger.info(f"Loaded FAISS index for {doc_id}", doc_id=doc_id, vectors_count=index.ntotal)
+            self.logger.info(f"Loaded FAISS index for {doc_id}, vectors_count={index.ntotal}")
             return index
         except Exception as e:
             self.logger.error(f"Failed to load FAISS index for {doc_id}: {str(e)}", exc_info=True)
@@ -96,12 +96,8 @@ class FAISSStore:
             with open(meta_path, 'w') as f:
                 json.dump(metadata, f, indent=2)
             
-            self.logger.info(
-                f"Saved FAISS index for {doc_id}",
-                doc_id=doc_id,
-                vectors_count=index.ntotal,
-                index_size_mb=index_path.stat().st_size / (1024 * 1024)
-            )
+            index_size_mb = index_path.stat().st_size / (1024 * 1024)
+            self.logger.info(f"Saved FAISS index for {doc_id}, vectors_count={index.ntotal}, index_size_mb={index_size_mb}")
             
         except Exception as e:
             self.logger.error(f"Failed to save FAISS index for {doc_id}: {str(e)}", exc_info=True)
@@ -116,10 +112,10 @@ class FAISSStore:
             chunks: List of chunks to embed and store
         """
         if not chunks:
-            self.logger.warning(f"No chunks provided for {doc_id}", doc_id=doc_id)
+            self.logger.warning(f"No chunks provided for {doc_id}")
             return
         
-        self.logger.info(f"Starting FAISS upsert for {doc_id}", doc_id=doc_id, chunks_count=len(chunks))
+        self.logger.info(f"Starting FAISS upsert for {doc_id}, chunks_count={len(chunks)}")
         
         try:
             # Generate embeddings for all chunks
@@ -129,6 +125,7 @@ class FAISSStore:
             index = self.create_index(doc_id)
             
             # Normalize embeddings for cosine similarity
+            embeddings = embeddings.astype('float32')
             faiss.normalize_L2(embeddings)
             
             # Add vectors to index
@@ -151,7 +148,7 @@ class FAISSStore:
             # Save index and metadata
             self.save_index(doc_id, index, metadata)
             
-            self.logger.info(f"FAISS upsert completed for {doc_id}", doc_id=doc_id, vectors_count=len(chunks))
+            self.logger.info(f"FAISS upsert completed for {doc_id}, vectors_count={len(chunks)}")
             
         except Exception as e:
             self.logger.error(f"Failed to upsert chunks for {doc_id}: {str(e)}", exc_info=True)
@@ -172,17 +169,17 @@ class FAISSStore:
         # Load index and metadata
         index = self.load_index(doc_id)
         if index is None:
-            self.logger.warning(f"No FAISS index found for {doc_id}", doc_id=doc_id)
+            self.logger.warning(f"No FAISS index found for {doc_id}")
             return []
         
         metadata = self._load_metadata(doc_id)
         if not metadata:
-            self.logger.warning(f"No metadata found for {doc_id}", doc_id=doc_id)
+            self.logger.warning(f"No metadata found for {doc_id}")
             return []
         
         try:
             # Normalize query embedding
-            query_embedding = query_embedding.reshape(1, -1)
+            query_embedding = query_embedding.reshape(1, -1).astype('float32')
             faiss.normalize_L2(query_embedding)
             
             # Search
@@ -201,12 +198,7 @@ class FAISSStore:
                     result["vector_id"] = vector_id
                     results.append(result)
             
-            self.logger.info(
-                f"FAISS search completed for {doc_id}",
-                doc_id=doc_id,
-                query_k=k,
-                results_count=len(results)
-            )
+            self.logger.info(f"FAISS search completed for {doc_id}, query_k={k}, results_count={len(results)}")
             
             return results
             
@@ -264,8 +256,8 @@ class FAISSStore:
                 input=texts
             )
             
-            embeddings = np.array([data.embedding for data in response.data])
-            self.logger.info(f"Generated {len(embeddings)} embeddings", embeddings_count=len(embeddings))
+            embeddings = np.array([data.embedding for data in response.data], dtype='float32')
+            self.logger.info(f"Generated {len(embeddings)} embeddings")
             
             return embeddings
             
@@ -297,8 +289,8 @@ class FAISSStore:
     
     def _get_index_path(self, doc_id: str) -> Path:
         """Get the path to the FAISS index file."""
-        return settings.indices_path / f"{doc_id}.faiss"
+        return settings.paths["indices"] / f"{doc_id}.faiss"
     
     def _get_meta_path(self, doc_id: str) -> Path:
         """Get the path to the metadata file."""
-        return settings.indices_path / f"{doc_id}.faiss.meta.json"
+        return settings.paths["indices"] / f"{doc_id}.faiss.meta.json"

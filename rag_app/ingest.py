@@ -11,13 +11,13 @@ from typing import List, Dict, Any
 import pandas as pd
 from openai import OpenAI
 
-from config import settings
-from models import IngestResponse
-from utils.parsing import PDFParser
-from utils.chunking import TokenAwareChunker
-from store.faiss_store import FAISSStore
-from store.sqlite_store import SQLiteStore
-from utils.logging import log_timing
+from .config import settings
+from .models import IngestResponse
+from .utils.parsing import PDFParser
+from .utils.chunking import TokenAwareChunker
+from .store.faiss_store import FAISSStore
+from .store.sqlite_store import SQLiteStore
+from .utils.logging import log_timing
 
 
 logger = logging.getLogger(__name__)
@@ -39,8 +39,8 @@ class DocumentIngester:
         # Initialize components
         self.parser = PDFParser()
         self.chunker = TokenAwareChunker(
-            chunk_size=settings.chunk_size,
-            chunk_overlap=settings.chunk_overlap
+            chunk_size=settings.CHUNK_SIZE,
+            chunk_overlap=settings.CHUNK_OVERLAP
         )
         self.faiss_store = FAISSStore(openai_client)
         self.sqlite_store = SQLiteStore()
@@ -57,7 +57,7 @@ class DocumentIngester:
             IngestResponse with processing results
         """
         start_time = time.time()
-        self.logger.info(f"Starting document ingestion for {doc_id}", doc_id=doc_id, pdf_path=str(pdf_path))
+        self.logger.info(f"Starting document ingestion for {doc_id}, pdf_path={str(pdf_path)}")
         
         try:
             # Step 1: Parse PDF
@@ -100,13 +100,7 @@ class DocumentIngester:
             # Calculate total processing time
             total_time = time.time() - start_time
             
-            self.logger.info(
-                f"Document ingestion completed for {doc_id}",
-                doc_id=doc_id,
-                pages_count=len(pages),
-                chunks_count=len(chunks),
-                total_time=total_time
-            )
+            self.logger.info(f"Document ingestion completed for {doc_id}, pages_count={len(pages)}, chunks_count={len(chunks)}, total_time={total_time}")
             
             return IngestResponse(
                 doc_id=doc_id,
@@ -146,10 +140,10 @@ class DocumentIngester:
             df = pd.DataFrame(chunk_data)
             
             # Save to Parquet
-            chunks_file = settings.chunks_path / f"{doc_id}.parquet"
+            chunks_file = settings.paths["chunks"] / f"{doc_id}.parquet"
             df.to_parquet(chunks_file, index=False)
             
-            self.logger.info(f"Saved chunks snapshot for {doc_id}", doc_id=doc_id, chunks_file=str(chunks_file))
+            self.logger.info(f"Saved chunks snapshot for {doc_id}, chunks_file={str(chunks_file)}")
             
         except Exception as e:
             self.logger.warning(f"Failed to save chunks snapshot for {doc_id}: {str(e)}")
@@ -173,11 +167,11 @@ class DocumentIngester:
             sqlite_stats = self.sqlite_store.get_stats(doc_id)
             
             # Get chunks file info
-            chunks_file = settings.chunks_path / f"{doc_id}.parquet"
+            chunks_file = settings.paths["chunks"] / f"{doc_id}.parquet"
             chunks_size = chunks_file.stat().st_size / (1024 * 1024) if chunks_file.exists() else 0
             
             # Get PDF file info
-            pdf_file = settings.docs_path / f"{doc_id}.pdf"
+            pdf_file = settings.paths["docs"] / f"{doc_id}.pdf"
             pdf_size = pdf_file.stat().st_size / (1024 * 1024) if pdf_file.exists() else 0
             
             return {
@@ -186,8 +180,8 @@ class DocumentIngester:
                 "sqlite": sqlite_stats,
                 "chunks_file_size_mb": chunks_size,
                 "pdf_file_size_mb": pdf_size,
-                "chunk_size": settings.chunk_size,
-                "chunk_overlap": settings.chunk_overlap
+                "chunk_size": settings.CHUNK_SIZE,
+                "chunk_overlap": settings.CHUNK_OVERLAP
             }
             
         except Exception as e:

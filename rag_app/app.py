@@ -8,20 +8,20 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 
-from config import settings
-from models import (
+from .config import settings
+from .models import (
     IngestRequest, IngestResponse, QueryRequest, QueryResponse,
     DocumentStats, HealthResponse, ErrorResponse
 )
-from ingest import DocumentIngester
-from retrieve import HybridRetriever
-from answer import AnswerGenerator
-from utils.logging import setup_logging, log_timing, log_error
+from .ingest import DocumentIngester
+from .retrieve import HybridRetriever
+from .answer import AnswerGenerator
+from .utils.logging import setup_logging, log_timing, log_error
 
 
 # Setup logging
@@ -38,14 +38,18 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React dev server
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3002",
+        "https://*.onrender.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Initialize OpenAI client
-openai_client = OpenAI(api_key=settings.openai_api_key)
+openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 # Initialize services
 ingester = DocumentIngester(openai_client)
@@ -56,31 +60,32 @@ answer_generator = AnswerGenerator(openai_client)
 @app.on_event("startup")
 async def startup_event():
     """Initialize the application on startup."""
-    logger.info("Starting RAG Document Q&A Service", version="1.0.0")
+    logger.info("Starting RAG Document Q&A Service version=1.0.0")
     
-    # Validate OpenAI API key
-    try:
-        # Test the API key with a simple request
-        openai_client.models.list()
-        logger.info("OpenAI API key validated successfully")
-    except Exception as e:
-        logger.error(f"OpenAI API key validation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="OpenAI API key validation failed")
+    # Validate OpenAI API key (skip for test keys)
+    if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "test_key":
+        try:
+            # Test the API key with a simple request
+            openai_client.models.list()
+            logger.info("OpenAI API key validated successfully")
+        except Exception as e:
+            logger.error(f"OpenAI API key validation failed: {str(e)}")
+            raise HTTPException(status_code=500, detail="OpenAI API key validation failed")
+    else:
+        logger.info("Skipping OpenAI API key validation for test environment")
     
-    # Ensure data directories exist
-    settings.setup_directories()
+    # Data directories are created on import in config.py
     logger.info("Application startup completed")
 
 
-@app.get("/health", response_model=HealthResponse)
-async def health_check():
-    """Health check endpoint."""
-    return HealthResponse(status="ok", version="1.0.0")
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest_document(
-    doc_id: str,
+    doc_id: str = Form(...),
     file: UploadFile = File(...)
 ):
     """
@@ -94,7 +99,7 @@ async def ingest_document(
         IngestResponse with processing results
     """
     start_time = time.time()
-    logger.info(f"Starting document ingestion", doc_id=doc_id, filename=file.filename)
+    logger.info(f"Starting document ingestion for doc_id={doc_id}, filename={file.filename}")
     
     try:
         # Validate doc_id format
@@ -112,20 +117,13 @@ async def ingest_document(
                 detail="File must be a PDF (application/pdf)"
             )
         
-        # Check file size
-        if file.size and file.size > settings.max_upload_size:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File size exceeds maximum allowed size of {settings.max_upload_size / (1024*1024):.1f}MB"
-            )
-        
         # Save uploaded file
-        pdf_path = settings.docs_path / f"{doc_id}.pdf"
+        pdf_path = settings.paths["docs"] / f"{doc_id}.pdf"
         with open(pdf_path, "wb") as buffer:
             content = await file.read()
             buffer.write(content)
         
-        logger.info(f"Saved uploaded file", doc_id=doc_id, file_size=len(content))
+        logger.info(f"Saved uploaded file doc_id={doc_id}, file_size={len(content)}")
         
         # Ingest document
         response = ingester.ingest_document(pdf_path, doc_id)
@@ -139,7 +137,7 @@ async def ingest_document(
     except HTTPException:
         raise
     except Exception as e:
-        log_error(logger, e, "document_ingestion", doc_id=doc_id)
+        log_error(logger, e, "document_ingestion")
         raise HTTPException(status_code=500, detail="Document ingestion failed")
 
 
@@ -155,7 +153,7 @@ async def query_document(request: QueryRequest):
         QueryResponse with answer, citations, and snippets
     """
     start_time = time.time()
-    logger.info(f"Starting document query", doc_id=request.doc_id, question=request.question)
+    logger.info(f"Starting document query doc_id={request.doc_id}, question={request.question}")
     
     try:
         # Retrieve relevant chunks
@@ -196,7 +194,7 @@ async def query_document(request: QueryRequest):
         return response
         
     except Exception as e:
-        log_error(logger, e, "document_query", doc_id=request.doc_id, question=request.question)
+        log_error(logger, e, "document_query")
         raise HTTPException(status_code=500, detail="Document query failed")
 
 
@@ -211,7 +209,7 @@ async def get_document_stats(doc_id: str):
     Returns:
         DocumentStats with document information
     """
-    logger.info(f"Getting document stats", doc_id=doc_id)
+    logger.info(f"Getting document stats doc_id={doc_id}")
     
     try:
         # Get ingestion stats
@@ -221,7 +219,7 @@ async def get_document_stats(doc_id: str):
             raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
         
         # Get file modification time
-        pdf_file = settings.docs_path / f"{doc_id}.pdf"
+        pdf_file = settings.paths["docs"] / f"{doc_id}.pdf"
         last_ingested = None
         if pdf_file.exists():
             last_ingested = pdf_file.stat().st_mtime
@@ -276,7 +274,7 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "app:app",
-        host=settings.host,
-        port=settings.port,
+        host="0.0.0.0",
+        port=8000,
         reload=True
     )

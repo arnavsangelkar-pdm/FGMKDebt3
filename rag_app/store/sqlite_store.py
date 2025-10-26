@@ -10,8 +10,8 @@ from typing import List, Dict, Any, Optional
 import sqlite3
 from sqlite3 import Connection
 
-from config import settings
-from utils.chunking import Chunk
+from ..config import settings
+from ..utils.chunking import Chunk
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class SQLiteStore:
         self.logger = logger
         
         # Ensure sqlite directory exists
-        settings.sqlite_path.mkdir(parents=True, exist_ok=True)
+        settings.paths["sqlite"].mkdir(parents=True, exist_ok=True)
     
     def create_database(self, doc_id: str) -> Connection:
         """
@@ -90,7 +90,7 @@ class SQLiteStore:
             """)
             
             conn.commit()
-            self.logger.info(f"Created SQLite database for {doc_id}", doc_id=doc_id, db_path=str(db_path))
+            self.logger.info(f"Created SQLite database for {doc_id}, db_path={str(db_path)}")
             
         except Exception as e:
             conn.close()
@@ -122,7 +122,7 @@ class SQLiteStore:
             tables = [row[0] for row in cursor.fetchall()]
             
             if len(tables) != 2:
-                self.logger.warning(f"SQLite database for {doc_id} is missing required tables", doc_id=doc_id)
+                self.logger.warning(f"SQLite database for {doc_id} is missing required tables")
                 conn.close()
                 return None
             
@@ -130,7 +130,7 @@ class SQLiteStore:
             cursor = conn.execute("SELECT COUNT(*) FROM chunks")
             chunk_count = cursor.fetchone()[0]
             
-            self.logger.info(f"Loaded SQLite database for {doc_id}", doc_id=doc_id, chunks_count=chunk_count)
+            self.logger.info(f"Loaded SQLite database for {doc_id}, chunks_count={chunk_count}")
             return conn
             
         except Exception as e:
@@ -146,10 +146,10 @@ class SQLiteStore:
             chunks: List of chunks to store
         """
         if not chunks:
-            self.logger.warning(f"No chunks provided for {doc_id}", doc_id=doc_id)
+            self.logger.warning(f"No chunks provided for {doc_id}")
             return
         
-        self.logger.info(f"Starting SQLite upsert for {doc_id}", doc_id=doc_id, chunks_count=len(chunks))
+        self.logger.info(f"Starting SQLite upsert for {doc_id}, chunks_count={len(chunks)}")
         
         # Create new database (this replaces any existing one)
         conn = self.create_database(doc_id)
@@ -206,7 +206,7 @@ class SQLiteStore:
         """
         conn = self.load_database(doc_id)
         if conn is None:
-            self.logger.warning(f"No SQLite database found for {doc_id}", doc_id=doc_id)
+            self.logger.warning(f"No SQLite database found for {doc_id}")
             return []
         
         try:
@@ -313,4 +313,4 @@ class SQLiteStore:
     
     def _get_db_path(self, doc_id: str) -> Path:
         """Get the path to the SQLite database file."""
-        return settings.sqlite_path / f"{doc_id}.db"
+        return settings.paths["sqlite"] / f"{doc_id}.db"

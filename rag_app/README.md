@@ -31,23 +31,17 @@ A minimal, production-ready Retrieval-Augmented Generation (RAG) web service tha
 1. **Clone and setup**:
    ```bash
    cd rag_app
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   cp .env.sample .env
+   # Edit .env and set OPENAI_API_KEY
    pip install -r requirements.txt
    ```
 
-2. **Configure environment**:
+2. **Run the service**:
    ```bash
-   cp env.sample .env
-   # Edit .env and add your OPENAI_API_KEY
+   uvicorn rag_app.app:app --host 0.0.0.0 --port 8000
    ```
 
-3. **Run the service**:
-   ```bash
-   uvicorn app:app --reload --host 0.0.0.0 --port 8000
-   ```
-
-4. **Test the service**:
+3. **Test the service**:
    ```bash
    curl http://localhost:8000/health
    ```

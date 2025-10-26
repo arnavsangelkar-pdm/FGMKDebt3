@@ -6,17 +6,26 @@ Combines vector search (FAISS) and keyword search (SQLite FTS5) for better resul
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict
+from functools import lru_cache
 
 import numpy as np
 from sentence_transformers import CrossEncoder
 from openai import OpenAI
 
-from config import settings
-from store.faiss_store import FAISSStore
-from store.sqlite_store import SQLiteStore
+from .config import settings
+from .store.faiss_store import FAISSStore
+from .store.sqlite_store import SQLiteStore
 
 
 logger = logging.getLogger(__name__)
+
+@lru_cache(maxsize=1)
+def get_reranker():
+    log = logging.getLogger(__name__)
+    log.info("Loading bge-reranker-base...")
+    model = CrossEncoder("BAAI/bge-reranker-base")
+    log.info("Loaded reranker")
+    return model
 
 
 class HybridRetriever:
@@ -36,15 +45,12 @@ class HybridRetriever:
         self.faiss_store = FAISSStore(openai_client)
         self.sqlite_store = SQLiteStore()
         
-        # Initialize reranker
-        self.reranker = CrossEncoder('BAAI/bge-reranker-base')
-        
         # Configuration
-        self.faiss_k = settings.faiss_k
-        self.fts_k = settings.fts_k
-        self.rerank_candidates = settings.rerank_candidates
-        self.rerank_top_n = settings.rerank_top_n
-        self.confidence_threshold = settings.confidence_threshold
+        self.faiss_k = settings.FAISS_K
+        self.fts_k = settings.FTS_K
+        self.rerank_candidates = settings.RERANK_CANDIDATES
+        self.rerank_top_n = settings.RERANK_TOP_N
+        self.confidence_threshold = settings.CONFIDENCE_THRESHOLD
     
     def retrieve(self, doc_id: str, question: str, k: Optional[int] = None) -> List[Dict[str, Any]]:
         """
@@ -61,7 +67,7 @@ class HybridRetriever:
         if k is None:
             k = self.rerank_top_n
         
-        self.logger.info(f"Starting hybrid retrieval for {doc_id}", doc_id=doc_id, question=question)
+        self.logger.info(f"Starting hybrid retrieval for {doc_id}, question={question}")
         
         try:
             # Step 1: Generate query embedding
@@ -82,14 +88,7 @@ class HybridRetriever:
             # Step 6: Apply confidence threshold
             final_results = self._apply_confidence_threshold(reranked_results[:k])
             
-            self.logger.info(
-                f"Hybrid retrieval completed for {doc_id}",
-                doc_id=doc_id,
-                faiss_results=len(faiss_results),
-                fts_results=len(fts_results),
-                rrf_results=len(rrf_results),
-                final_results=len(final_results)
-            )
+            self.logger.info(f"Hybrid retrieval completed for {doc_id}, faiss_results={len(faiss_results)}, fts_results={len(fts_results)}, rrf_results={len(rrf_results)}, final_results={len(final_results)}")
             
             return final_results
             
@@ -109,11 +108,11 @@ class HybridRetriever:
         """
         try:
             response = self.openai_client.embeddings.create(
-                model=settings.openai_embedding_model,
+                model=settings.OPENAI_EMBEDDING_MODEL,
                 input=question
             )
             
-            embedding = np.array(response.data[0].embedding)
+            embedding = np.array(response.data[0].embedding, dtype='float32')
             return embedding
             
         except Exception as e:
@@ -168,12 +167,7 @@ class HybridRetriever:
             result["rrf_score"] = score
             sorted_results.append(result)
         
-        self.logger.info(
-            f"RRF completed",
-            faiss_results=len(faiss_results),
-            fts_results=len(fts_results),
-            combined_results=len(sorted_results)
-        )
+        self.logger.info(f"RRF completed, faiss_results={len(faiss_results)}, fts_results={len(fts_results)}, combined_results={len(sorted_results)}")
         
         return sorted_results
     
@@ -192,13 +186,16 @@ class HybridRetriever:
             return []
         
         try:
+            # Get reranker (lazy loaded)
+            reranker = get_reranker()
+            
             # Prepare query-document pairs for reranking
             pairs = []
             for candidate in candidates:
                 pairs.append([question, candidate["text"]])
             
             # Get reranking scores
-            rerank_scores = self.reranker.predict(pairs)
+            rerank_scores = reranker.predict(pairs)
             
             # Normalize scores to [0, 1] range
             min_score = min(rerank_scores)
@@ -216,12 +213,9 @@ class HybridRetriever:
             # Sort by rerank score (descending)
             reranked = sorted(candidates, key=lambda x: x["rerank_score"], reverse=True)
             
-            self.logger.info(
-                f"Reranking completed",
-                candidates_count=len(candidates),
-                top_score=reranked[0]["rerank_score"] if reranked else 0,
-                avg_confidence=sum(c["confidence"] for c in reranked) / len(reranked) if reranked else 0
-            )
+            top_score = reranked[0]["rerank_score"] if reranked else 0
+            avg_conf = sum(c["confidence"] for c in reranked) / len(reranked) if reranked else 0
+            self.logger.info(f"Reranking completed, candidates_count={len(candidates)}, top_score={top_score}, avg_confidence={avg_conf}")
             
             return reranked
             
@@ -250,11 +244,7 @@ class HybridRetriever:
         best_confidence = results[0].get("confidence", 0.0)
         
         if best_confidence < self.confidence_threshold:
-            self.logger.warning(
-                f"Best result confidence {best_confidence:.3f} below threshold {self.confidence_threshold}",
-                best_confidence=best_confidence,
-                threshold=self.confidence_threshold
-            )
+            self.logger.warning(f"Best result confidence {best_confidence:.3f} below threshold {self.confidence_threshold}")
             return []  # Return empty results if confidence is too low
         
         # Return all results (they're already sorted by confidence)

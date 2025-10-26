@@ -1,11 +1,17 @@
 services:
   - type: web
-    name: rag-app
-    env: docker
-    autoDeploy: true
+    name: rag-api
+    env: python
     plan: starter
     healthCheckPath: /health
-    dockerfilePath: ./Dockerfile
+    buildCommand: |
+      pip install -r requirements.txt
+      python - <<'PY'
+from sentence_transformers import CrossEncoder
+CrossEncoder("BAAI/bge-reranker-base")
+print("Reranker preloaded")
+PY
+    startCommand: uvicorn rag_app.app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
         sync: false
@@ -13,23 +19,5 @@ services:
         value: gpt-4o-mini
       - key: OPENAI_EMBEDDING_MODEL
         value: text-embedding-3-small
-      - key: CHUNK_SIZE
-        value: "500"
-      - key: CHUNK_OVERLAP
-        value: "50"
-      - key: FAISS_K
-        value: "20"
-      - key: FTS_K
-        value: "20"
-      - key: RERANK_CANDIDATES
-        value: "30"
-      - key: RERANK_TOP_N
-        value: "5"
-      - key: CONFIDENCE_THRESHOLD
-        value: "0.35"
       - key: DATA_DIR
-        value: "data"
-      - key: MAX_UPLOAD_SIZE
-        value: "104857600"  # 100MB in bytes
-      - key: PORT
-        value: "10000"
+        value: data

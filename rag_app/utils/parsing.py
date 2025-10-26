@@ -46,10 +46,11 @@ class PDFParser:
             FileNotFoundError: If PDF file doesn't exist
             Exception: If PDF parsing fails
         """
+        pdf_path = Path(pdf_path)
         if not pdf_path.exists():
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
         
-        self.logger.info(f"Starting PDF parsing for {doc_id}", doc_id=doc_id, pdf_path=str(pdf_path))
+        self.logger.info(f"Starting PDF parsing for {doc_id}, pdf_path={str(pdf_path)}")
         
         try:
             # Open PDF document
@@ -64,12 +65,8 @@ class PDFParser:
             
             doc.close()
             
-            self.logger.info(
-                f"PDF parsing completed for {doc_id}",
-                doc_id=doc_id,
-                pages_count=len(pages),
-                total_characters=sum(len(p.text) for p in pages)
-            )
+            total_chars = sum(len(p.text) for p in pages)
+            self.logger.info(f"PDF parsing completed for {doc_id}, pages_count={len(pages)}, total_characters={total_chars}")
             
             return pages
             
@@ -111,7 +108,7 @@ class PDFParser:
             full_text = "\n\n".join(text_blocks)
             
             if not full_text.strip():
-                self.logger.warning(f"No text found on page {page_num + 1}", page=page_num + 1)
+                self.logger.warning(f"No text found on page {page_num + 1}")
                 return None
             
             # Detect section/heading (simple heuristic based on font size)

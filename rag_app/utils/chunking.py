@@ -61,7 +61,7 @@ class TokenAwareChunker:
         Returns:
             List of Chunk objects
         """
-        self.logger.info(f"Starting chunking for {doc_id}", doc_id=doc_id, pages_count=len(pages))
+        self.logger.info(f"Starting chunking for {doc_id}, pages_count={len(pages)}")
         
         all_chunks = []
         char_offset = 0
@@ -71,12 +71,8 @@ class TokenAwareChunker:
             all_chunks.extend(page_chunks)
             char_offset += len(page.text)
         
-        self.logger.info(
-            f"Chunking completed for {doc_id}",
-            doc_id=doc_id,
-            chunks_count=len(all_chunks),
-            avg_chunk_size=sum(c.token_count for c in all_chunks) / len(all_chunks) if all_chunks else 0
-        )
+        avg_chunk_size = sum(c.token_count for c in all_chunks) / len(all_chunks) if all_chunks else 0
+        self.logger.info(f"Chunking completed for {doc_id}, chunks_count={len(all_chunks)}, avg_chunk_size={avg_chunk_size}")
         
         return all_chunks
     
@@ -204,22 +200,12 @@ class TokenAwareChunker:
         for chunk in chunks:
             # Check token count is within reasonable bounds
             if chunk.token_count > self.chunk_size * 1.1:  # Allow 10% tolerance
-                self.logger.warning(
-                    f"Chunk {chunk.chunk_id} exceeds expected size",
-                    chunk_id=chunk.chunk_id,
-                    token_count=chunk.token_count,
-                    expected_max=self.chunk_size
-                )
+                self.logger.warning(f"Chunk {chunk.chunk_id} exceeds expected size, token_count={chunk.token_count}, expected_max={self.chunk_size}")
                 return False
             
             # Check character positions are valid
             if chunk.char_start < 0 or chunk.char_end <= chunk.char_start:
-                self.logger.warning(
-                    f"Chunk {chunk.chunk_id} has invalid character positions",
-                    chunk_id=chunk.chunk_id,
-                    char_start=chunk.char_start,
-                    char_end=chunk.char_end
-                )
+                self.logger.warning(f"Chunk {chunk.chunk_id} has invalid character positions, char_start={chunk.char_start}, char_end={chunk.char_end}")
                 return False
         
         return True
