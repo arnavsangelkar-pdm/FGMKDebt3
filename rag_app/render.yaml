@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: rag-app
+    env: docker
+    autoDeploy: true
+    plan: starter
+    healthCheckPath: /health
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: CHUNK_SIZE
+        value: "500"
+      - key: CHUNK_OVERLAP
+        value: "50"
+      - key: FAISS_K
+        value: "20"
+      - key: FTS_K
+        value: "20"
+      - key: RERANK_CANDIDATES
+        value: "30"
+      - key: RERANK_TOP_N
+        value: "5"
+      - key: CONFIDENCE_THRESHOLD
+        value: "0.35"
+      - key: DATA_DIR
+        value: "data"
+      - key: MAX_UPLOAD_SIZE
+        value: "104857600"  # 100MB in bytes
+      - key: PORT
+        value: "10000"
