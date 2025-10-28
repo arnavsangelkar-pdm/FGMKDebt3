@@ -10,8 +10,8 @@ from typing import List, Dict, Any, Optional
 import sqlite3
 from sqlite3 import Connection
 
-from ..config import settings
-from ..utils.chunking import Chunk
+from config import settings
+from utils.chunking import Chunk
 
 
 logger = logging.getLogger(__name__)
@@ -179,10 +179,7 @@ class SQLiteStore:
             fts_count = cursor.fetchone()[0]
             
             self.logger.info(
-                f"SQLite upsert completed for {doc_id}",
-                doc_id=doc_id,
-                chunks_count=len(chunks),
-                fts_count=fts_count
+                f"SQLite upsert completed for {doc_id}, chunks_count={len(chunks)}, fts_count={fts_count}"
             )
             
         except Exception as e:
@@ -210,8 +207,13 @@ class SQLiteStore:
             return []
         
         try:
+            # Format query for FTS5 - escape special characters and use proper syntax
+            formatted_query = query.replace('"', '""')  # Escape quotes
+            if not formatted_query.strip():
+                return []
+            
             # Use FTS5 bm25() function for scoring
-            cursor = conn.execute("""
+            cursor = conn.execute(f"""
                 SELECT 
                     c.id,
                     c.page,
@@ -224,10 +226,10 @@ class SQLiteStore:
                     bm25(chunks_fts) as bm25_score
                 FROM chunks_fts
                 JOIN chunks c ON chunks_fts.rowid = c.id
-                WHERE chunks_fts MATCH ?
+                WHERE chunks_fts MATCH "{formatted_query}"
                 ORDER BY bm25(chunks_fts)
-                LIMIT ?
-            """, (query, k))
+                LIMIT {k}
+            """)
             
             results = []
             for row in cursor.fetchall():

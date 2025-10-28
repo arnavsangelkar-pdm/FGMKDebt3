@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     CONFIDENCE_THRESHOLD: float = 0.35
 
     DATA_DIR: str = "data"
+    MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB
 
     @property
     def paths(self):
@@ -27,6 +28,10 @@ class Settings(BaseSettings):
             "sqlite": root / "sqlite",
             "chunks": root / "chunks",
         }
+    
+    @property
+    def docs_path(self):
+        return Path(self.DATA_DIR) / "docs"
 
 settings = Settings()  # loads from env
 for p in settings.paths.values():

@@ -9,19 +9,20 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 
-from .config import settings
-from .models import (
+from config import settings
+from models import (
     IngestRequest, IngestResponse, QueryRequest, QueryResponse,
     DocumentStats, HealthResponse, ErrorResponse
 )
-from .ingest import DocumentIngester
-from .retrieve import HybridRetriever
-from .answer import AnswerGenerator
-from .utils.logging import setup_logging, log_timing, log_error
+from ingest import DocumentIngester
+from retrieve import HybridRetriever
+from answer import AnswerGenerator
+from utils.logging import setup_logging, log_timing, log_error
 
 
 # Setup logging
@@ -47,6 +48,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for frontend
+frontend_path = Path(__file__).parent.parent / "rag-frontend" / "build"
+if frontend_path.exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_path / "static")), name="static")
 
 # Initialize OpenAI client
 openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -81,6 +87,15 @@ async def startup_event():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/")
+async def serve_frontend():
+    """Serve the frontend application."""
+    frontend_path = Path(__file__).parent.parent / "rag-frontend" / "build" / "index.html"
+    if frontend_path.exists():
+        return FileResponse(str(frontend_path))
+    else:
+        return {"message": "Frontend not found. Please build the frontend first."}
 
 
 @app.post("/ingest", response_model=IngestResponse)

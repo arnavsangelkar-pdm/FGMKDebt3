@@ -12,9 +12,9 @@ import numpy as np
 from sentence_transformers import CrossEncoder
 from openai import OpenAI
 
-from .config import settings
-from .store.faiss_store import FAISSStore
-from .store.sqlite_store import SQLiteStore
+from config import settings
+from store.faiss_store import FAISSStore
+from store.sqlite_store import SQLiteStore
 
 
 logger = logging.getLogger(__name__)

@@ -9,8 +9,8 @@ from dataclasses import dataclass
 
 from openai import OpenAI
 
-from .config import settings
-from .models import Citation, Snippet
+from config import settings
+from models import Citation, Snippet
 
 
 logger = logging.getLogger(__name__)
@@ -136,10 +136,12 @@ class AnswerGenerator:
         Returns:
             Generated answer text
         """
-        system_prompt = """You are a document QA assistant. You must use ONLY the provided snippets from the user's document to answer.
-- If the answer is not clearly supported by the snippets, reply exactly: "Not found in document."
+        system_prompt = """You are a document QA assistant. Use the provided snippets from the user's document to answer questions.
+- Extract relevant information from the snippets to answer the question.
+- If the snippets contain relevant information, provide a helpful answer even if it's not a direct quote.
 - For each sentence that uses evidence, add an inline citation formatted as [Doc: p. <page>].
 - Keep answers concise (1–5 sentences) and faithful to the source.
+- Only reply "Not found in document." if the snippets contain absolutely no relevant information to the question.
 - Do not speculate or use external knowledge."""
 
         user_prompt = f"""Question: "{question}"
@@ -149,9 +151,9 @@ Snippets:
 {formatted_snippets}
 
 Instructions:
-- Answer only from the snippets.
+- Answer the question using information from the snippets.
 - Add [Doc: p. <page>] after each sentence that uses evidence.
-- If insufficient evidence: "Not found in document." """
+- Only say "Not found in document." if the snippets contain no relevant information at all."""
 
         try:
             response = self.openai_client.chat.completions.create(

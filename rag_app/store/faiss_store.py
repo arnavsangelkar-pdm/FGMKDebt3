@@ -12,8 +12,8 @@ import faiss
 import numpy as np
 from openai import OpenAI
 
-from ..config import settings
-from ..utils.chunking import Chunk
+from config import settings
+from utils.chunking import Chunk
 
 
 logger = logging.getLogger(__name__)
